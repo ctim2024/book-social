@@ -1,0 +1,81 @@
+/* groovylint-disable CompileStatic, GStringExpressionWithinString, NoDef */
+pipeline {
+    agent { label 'agent1_laptop' }
+    //agent any
+    environment {
+        //VERSION = '1.0.5'
+        DOCKERHUB_CREDENTIALS = credentials('boubaker1982-dockerhub')
+    }
+    tools {
+        maven 'my_maven'
+        jdk 'jdk.17'
+        dockerTool 'my_docker'
+    }
+    stages {
+      
+    
+        stage('get project version') {
+           
+            steps {
+                echo 'Building image for the application....'
+                script {
+                    // Capture the version from Maven command
+                    def projectVersion = sh(
+                      script: '''
+                      cd book-network-ui
+                      echo "$(jq -r '.version' package.json)"
+                      ''',
+                      returnStdout: true
+                  ).trim()
+                    // Assign the captured version to the environment variable
+                    env.VERSION = projectVersion
+                    echo "Captured version: ${env.VERSION}"
+                }
+            }
+        }
+
+        stage('build and push image') {
+          
+            steps {
+                echo 'build and push image......'
+               script{
+                withDockerRegistry(credentialsId:'boubaker1982-dockerhub'){
+
+                sh '''
+                cd book-network-ui
+                docker build -t $DOCKERHUB_CREDENTIALS_USR/bsn-ui:${VERSION} -f ../docker/frontend/Dockerfile .
+                docker push $DOCKERHUB_CREDENTIALS_USR/bsn-ui:${VERSION}
+                '''
+
+                }
+               }
+                
+            }
+        }
+        stage('deploy') {
+            agent { label 'agent_gogs' }
+            steps {
+                echo 'deploying the application....'
+                  sh '''
+
+                 export VERSION=${VERSION}
+                 docker-compose down --remove-orphans
+                 docker-compose -f docker-compose-ui.yml up -d
+
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            echo 'stages are done....'
+            sh 'docker logout'
+        }
+        success {
+            echo 'stages are done successfully....'
+        }
+        failure {
+            echo 'there are a failure.....'
+        }
+    }
+}

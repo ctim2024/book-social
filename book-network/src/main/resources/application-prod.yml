@@ -37,7 +37,7 @@ application:
       frontend:
          activate-url: http://localhost:8085/activate-account
     cors:
-      origins: http://localhost:4200,http://localhost:8080,http://localhost:8085     
+      origins: http://10.71.1.53:8085     
     file:
       upload:
          photos-upload-path: ./uploads     

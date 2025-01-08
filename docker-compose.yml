@@ -16,33 +16,39 @@ services:
     networks:
       - spring-demo
     restart: unless-stopped
-  mail-dev:
-    container_name: mail-dev-bsn
-    image: maildev/maildev
-    ports:
-      - 1080:1080
-      - 1025:1025
+  # mail-dev:
+  #   container_name: mail-dev-bsn
+  #   image: maildev/maildev
+  #   ports:
+  #     - 1080:1080
+  #     - 1025:1025
   bsn-api:
     container_name: bsn-api
-    image: bsn/bsn:1.0.2
+    image: boubaker1982/bsn:${VERSION}
+    environment:
+      DB_URL: jdbc:mysql://mysql-db-bsn:3306/book_social_network
+      EMAIL_HOSTNAME: smtp.gmail.com
+      EMAIL_USER_NAME: belgecemjrad2018@gmail.com
+      EMAIL_PASSWORD: avhn rgmu lnff kgea
     ports:
       - 8088:8088
     networks:
       - spring-demo
-    depends_on:
-      - mysql 
-  bsn-ui:
-    container_name: bsn-ui
-    image: bsn/bsn-ui:1.0.0
-    ports:
-      - 8085:80
-    networks:
-      - spring-demo
-    depends_on:
-      - bsn-api       
+    # depends_on:
+    #   - mysql 
+  # bsn-ui:
+  #   container_name: bsn-ui
+  #   image: boubaker1982/bsn-ui:1.0.1
+  #   ports:
+  #     - 8085:80
+  #   networks:
+  #     - spring-demo
+  #   depends_on:
+  #     - bsn-api       
 networks:
   spring-demo:
-    driver: bridge
+    # driver: bridge
+    external: true
 
 volumes: 
   mysql:

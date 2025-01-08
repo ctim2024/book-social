@@ -1,0 +1,137 @@
+/* groovylint-disable CompileStatic, GStringExpressionWithinString, NoDef */
+pipeline {
+    agent { label 'agent1_laptop' }
+    //agent any
+    environment {
+      //  VERSION = ''
+        PROFILE = 'prod'
+        DOCKERHUB_CREDENTIALS = credentials('boubaker1982-dockerhub')
+        EMAIL_HOST_NAME = 'smtp.gmail.com'
+        EMAIL_USER_NAME = 'belgecemjrad2018@gmail.com'
+        EMAIL_PASSWORD = 'avhn rgmu lnff kgea'
+    }
+    tools {
+        maven 'my_maven'
+        jdk 'jdk.17'
+        dockerTool 'my_docker'
+    }
+    stages {
+        // stage('compile and test'){
+        // parallel {
+        stage('compile') {
+            when {
+                expression {
+                    env.BRANCH_NAME == 'main' || '1' == '2'
+                }
+            }
+            steps {
+                echo 'compiling the application....'
+                //sh 'env'  // display jenkins environment variables
+                // echo "the version is : ${NEW_VERSION}"
+                sh '''
+              cd book-network
+              mvn clean compile
+              '''
+            }
+        
+        }
+        stage('unit-tests') {
+            when {
+                expression {
+                    env.BRANCH_NAME == 'main' || '1' == '2'
+                }
+            }
+            steps {
+                echo 'testing the application....'
+                sh 'mvn clean test'
+            }
+        }
+      //  }
+        // }
+        stage('build') {
+            when {
+                expression {
+                    env.BRANCH_NAME == 'main' || '1' == '2'
+                }
+            }
+            steps {
+                echo 'building the application....'
+                sh '''
+             cd book-network
+             mvn clean package  -DskipTests
+             '''
+            }
+        }
+
+
+
+        stage('get project version') {
+           
+            steps {
+                echo 'Building image for the application....'
+                script {
+                    // Capture the version from Maven command
+                    def projectVersion = sh(
+                      script: '''
+                      cd book-network
+                      mvn help:evaluate -Dexpression=project.version -q -DforceStdout
+                      ''',
+                      returnStdout: true
+                  ).trim()
+                    // Assign the captured version to the environment variable
+                    env.VERSION = projectVersion
+                    echo "Captured version: ${env.VERSION}"
+                }
+            }
+        }
+
+        stage('build and push image') {
+          
+            steps {
+                echo 'build and push image......'
+               script{
+                withDockerRegistry(credentialsId:'boubaker1982-dockerhub'){
+
+                sh '''
+                cd book-network
+                docker build --build-arg APP_VERSION=${VERSION} --build-arg PROFILE=${PROFILE} -t $DOCKERHUB_CREDENTIALS_USR/bsn:${VERSION} -f ../docker/backend/Dockerfile .
+                docker push $DOCKERHUB_CREDENTIALS_USR/bsn:${VERSION}
+                '''
+
+                }
+               }
+                
+            }
+        }
+        stage('deploy') {
+            agent { label 'agent_gogs' }
+            steps {
+                echo 'deploying the application....'
+                sh '''
+
+                 export VERSION=${VERSION}
+                 docker-compose down --remove-orphans
+                 docker-compose  up -d
+
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            echo 'stages are done....'
+            sh 'docker logout'
+        }
+        success {
+        agent {label 'controler'}    
+            echo 'stages are done successfully....'
+            emailext(attachLog: true, body: 'pipeline1 done successfully', subject: 'pipeline1 done successfully', to: 'boubakerjrad1982@gmail.com')    
+        }
+        failure {
+            agent {label 'controler'}
+            echo 'there are a failure.....'
+              emailext(attachLog: true, body: 'pipeline1 done with failures', subject: 'pipeline1 done with failures', to: 'boubakerjrad1982@gmail.com')    
+  
+        }
+    }
+}
